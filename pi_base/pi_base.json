@@ -1,0 +1,72 @@
+  
+{
+    "variables": {
+        "os_user": "pi",
+        "newhost": "pi-image",
+        "homedir": "/home/pi",
+        "ds18b20_gpio_pin": "4",
+        "monit_configs": "check_system cpu_temp cron email_alerts enable_http_server  openssh-server root_partition",
+        "release":"buster",
+        "TEST_BUILD": "0"
+    },
+    "builders": [
+      {
+        "type": "arm-image",
+        "iso_url": "https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2020-12-04/2020-12-02-raspios-buster-armhf-lite.zip",
+        "iso_checksum_type": "sha256",
+        "iso_checksum": "186525f542056e953cb309c74a6398d8fef9bc808c6e83d82f358692a41e3964",
+        "target_image_size": 4294967296,
+        "image_mounts": ["/boot", "/"]      }
+    ],
+    "provisioners": [
+        {
+          "type": "file",
+          "source": "/mnt/pi_scripts",
+          "destination": "{{user `homedir`}}/scripts"
+        },
+        {
+          "type": "shell",
+          "environment_vars": [
+            "os_user={{user `os_user`}}",
+            "newhost={{user `newhost`}}",
+            "homedir={{user `homedir`}}",
+            "monit_configs={{user `monit_configs`}}",
+            "ds18b20_gpio_pin={{user `ds18b20_gpio_pin`}}",
+            "release={{user `release`}}",
+            "TEST_BUILD={{user `TEST_BUILD`}}"
+          ],
+          "execute_command": "sudo -S env {{ .Vars }} {{ .Path }}",
+          "scripts": [
+            "/mnt/scripts/01_check_image.sh",
+            "/mnt/scripts/05_assign_hostname.sh",
+            "/mnt/scripts/10_initial_image_prep.sh",
+            "/mnt/scripts/30_install_packages.sh",
+            "/mnt/scripts/80_configure_monit.sh"
+          ]
+        },
+        {
+          "type": "file",
+          "source": "/mnt/scripts/files/wpa_supplicant.conf",
+          "destination": "/boot/wpa_supplicant.conf"
+        },
+        {
+          "type": "file",
+          "source": "/mnt/scripts/files/authorized_keys",
+          "destination": "{{user `homedir`}}/.ssh/authorized_keys"
+        },
+        {
+          "type": "shell",
+          "environment_vars": [
+            "os_user={{user `os_user`}}",
+            "newhost={{user `newhost`}}",
+            "homedir={{user `homedir`}}",
+            "TEST_BUILD={{user `TEST_BUILD`}}"
+          ],
+          "execute_command": "sudo -S env {{ .Vars }} {{ .Path }}",
+          "scripts": [
+            "/mnt/scripts/90_set_permissions.sh",
+            "/mnt/scripts/95_zero_image.sh"
+          ]
+        }
+      ]
+  }

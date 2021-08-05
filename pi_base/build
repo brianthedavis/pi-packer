@@ -1,0 +1,108 @@
+#!/bin/bash
+#  Build a pi_base image
+# 
+#  This assumes it's ran from Brian's MacBook with the PC powered up.  If reworked to run from the PC
+#  the relative paths will likely need to change
+#
+#
+#
+#  If you repeatedly have errors with /dev/loop#BadAddress then restart your docker daemon or machine
+#  Occasionally the image resize doesn't work and you'll fail due to out of space on device -- just run again
+#
+
+
+set -e
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+NOW=$( date '+%Y%m%d' )
+
+IMGPATH="${DIR}/output-arm-image"
+# Name the output image based on the path this is invoked from
+IMGNAME="$( basename ${DIR} )_${NOW}.img"
+JSON="$( basename ${DIR} ).json"
+LOGFILE="$( basename ${DIR} )_${NOW}_build.log"
+
+# Redirect stdout ( > ) into a named pipe ( >() ) running "tee"
+exec > >(tee -ia $LOGFILE)
+# Without this, only stdout would be captured - i.e. your
+# log file would not contain any error messages.
+exec 2>&1
+
+
+
+echo "Building image: ${IMGNAME} with ${JSON}"
+
+
+# if [[ "$OSTYPE" == "linux-gnu" ]]; then
+#   # ubuntu vm
+#   IMAGE_PATH="/mnt/d_drive/Install SW/Raspberry Pi/"
+# elif [[ "$OSTYPE" == "darwin"* ]]; then
+#   # mac os
+#   IMAGE_PATH="/Volumes/D/Install SW/Raspberry Pi/"
+#   if [[ ! -e "${IMAGE_PATH}" ]]; then
+#     # Wake the PC up...
+#     curl https://pi.denverdavis.com/cmd/wake
+#     open 'smb://bjd55@pc/D'  # Mount the D drive
+#     sleep 5
+#   fi
+# fi
+IMAGE_PATH="${DIR}/.."
+
+if [[ ! -d "${IMAGE_PATH}" ]]; then
+  echo "ERROR: Couldn't find mounted image path ${IMAGE_PATH}."
+  exit 1
+fi
+
+
+# Clone a clean version of pi_scripts
+GIT_DIR=$( mktemp -d )
+GIT_DIR=/private${GIT_DIR}  # /private is a valid docker share
+echo -e "\n\nCloning pi_scripts to ${GIT_DIR}..."
+git clone git@github.com:brianthedavis/pi_scripts.git "${GIT_DIR}"
+
+echo "IMAGE PATH: ${IMAGE_PATH}"
+PROV_PATH="${DIR}/scripts"
+#CONTAINER="docker.denverdavis.com/packer-builder-arm:b9b6bb0"  # 2/23/2019
+#CONTAINER="docker.denverdavis.comcker-builder-arm:latest"
+CONTAINER="docker.pkg.github.com/solo-io/packer-builder-arm-image/packer-builder-arm:latest"
+# To run this container to explore, run:
+#   docker run -it --entrypoint /bin/sh packer-builder-arm
+set +e
+
+# This script may be invoked for all the other builds as well - allow secondary scripts to be invoked
+MOUNT_PATH=""
+if [[ -d ./setup ]]; then
+  echo "Found setup directory, including it in the docker mount"
+  MOUNT_PATH="-v ${DIR}/setup:/mnt/setup"
+fi
+
+echo -e "\n\nInvoking packer...\n"
+set -x
+# -it --entrypoint /bin/bash \
+docker run --privileged --rm \
+  -v ${DIR}:/build:ro \
+  -v ${DIR}/packer_cache:/build/packer_cache \
+  -v ${IMGPATH}:/build/output-arm-image \
+  -v "${IMAGE_PATH}":/mnt/image   \
+  -v "${PROV_PATH}":/mnt/scripts  \
+  -v "${GIT_DIR}":/mnt/pi_scripts ${MOUNT_PATH} \
+  ${CONTAINER} build ${JSON}
+
+if [[ "$?" != "0" ]]; then
+  echo "Docker return code: $?"
+  # Force delete of container if it fails
+  docker rm -v ${CONTAINER} 2>&1 /dev/null
+  exit 1
+else
+  echo -e "\n\nPACKER BUILD SUCCESS\n\n"
+fi
+
+set +
+
+echo "Cleaning up cloned git repo"
+# Clean up the cloned git repo
+rm -rf "${GIT_DIR}"
+
+echo "Renaming image to ${IMGPATH}/${IMGNAME}..."
+# Rename the image to something more predictable
+mv "${IMGPATH}/image" "${IMGPATH}/${IMGNAME}"

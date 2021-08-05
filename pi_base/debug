@@ -1,0 +1,42 @@
+#!/bin/bash
+#  Run the packer console inside the container - this script just makes it 
+# easier to invoke given the complexities of the run command
+
+
+set -e
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+NOW=$( date '+%Y%m%d' )
+
+IMGPATH="${DIR}/output-arm-image"
+# Name the output image based on the path this is invoked from
+IMGNAME="$( basename ${DIR} )_${NOW}.img"
+JSON="$( basename ${DIR} ).json"
+echo "Building image: ${IMGNAME} with ${JSON}"
+
+
+echo "IMAGE PATH: ${IMAGE_PATH}"
+PROV_PATH="${DIR}/scripts"
+CONTAINER="docker.denverdavis.com/packer-builder-arm:latest"
+
+set +e
+
+# This script may be invoked for all the other builds as well - allow secondary scripts to be invoked
+MOUNT_PATH=""
+if [[ -d ./setup ]]; then
+  echo "Found setup directory, including it in the docker mount"
+  MOUNT_PATH="-v \"${DIR}/setup\":/mnt/setup"
+fi
+
+echo -e "\n\nInvoking packer...\n"
+set -x
+# -it --entrypoint /bin/bash \
+docker run -it --privileged --rm \
+  -v ${DIR}:/build:ro \
+  -v ${DIR}/packer_cache:/build/packer_cache \
+  -v ${IMGPATH}:/build/output-arm-image \
+  -v "${PROV_PATH}":/mnt/scripts  \
+  -v "${GIT_DIR}":/mnt/pi_scripts ${MOUNT_PATH} \
+  ${CONTAINER} console -var-file variables.json ${JSON}
+set +x
+

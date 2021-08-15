@@ -20,11 +20,6 @@
     ],
     "provisioners": [
         {
-          "type": "file",
-          "source": "/mnt/pi_scripts",
-          "destination": "{{user `homedir`}}/scripts"
-        },
-        {
           "type": "shell",
           "environment_vars": [
             "os_user={{user `os_user`}}",

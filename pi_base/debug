@@ -36,7 +36,7 @@ docker run -it --privileged --rm \
   -v ${DIR}/packer_cache:/build/packer_cache \
   -v ${IMGPATH}:/build/output-arm-image \
   -v "${PROV_PATH}":/mnt/scripts  \
-  -v "${GIT_DIR}":/mnt/pi_scripts ${MOUNT_PATH} \
+  ${MOUNT_PATH} \
   ${CONTAINER} console -var-file variables.json ${JSON}
 set +x
 

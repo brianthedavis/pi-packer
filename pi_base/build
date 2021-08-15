@@ -53,17 +53,25 @@ if [[ ! -d "${IMAGE_PATH}" ]]; then
   exit 1
 fi
 
-
-# Clone a clean version of pi_scripts
-GIT_DIR=$( mktemp -d )
-GIT_DIR=/private${GIT_DIR}  # /private is a valid docker share
-echo -e "\n\nCloning pi_scripts to ${GIT_DIR}..."
-git clone git@github.com:brianthedavis/pi_scripts.git "${GIT_DIR}"
+# I personally like to seed my pi images with a personal github repo of scripts; that way every image has the same 
+# set of scripts on it (more or less) and I can update them with a pull later on if need be.  This step is optional, 
+# but if you want to include it you should uncomment this and add the 
+#    -v "${GIT_DIR}":/mnt/pi_scripts
+# to the docker run command below.  Additionally, in the pi_base.json file, add this to the provisioners (to copy the files over directly):
+        # {
+        #   "type": "file",
+        #   "source": "/mnt/pi_scripts",
+        #   "destination": "{{user `homedir`}}/scripts"
+        # },
+# ------------------------------------------------------------------------
+# GIT_DIR=$( mktemp -d )
+# GIT_DIR=/private${GIT_DIR}  # /private is a valid docker share
+# echo -e "\n\nCloning pi_scripts to ${GIT_DIR}..."
+# git clone git@github.com:brianthedavis/pi_scripts.git "${GIT_DIR}"
+# ------------------------------------------------------------------------
 
 echo "IMAGE PATH: ${IMAGE_PATH}"
 PROV_PATH="${DIR}/scripts"
-#CONTAINER="docker.denverdavis.com/packer-builder-arm:b9b6bb0"  # 2/23/2019
-#CONTAINER="docker.denverdavis.comcker-builder-arm:latest"
 CONTAINER="docker.pkg.github.com/solo-io/packer-builder-arm-image/packer-builder-arm:latest"
 # To run this container to explore, run:
 #   docker run -it --entrypoint /bin/sh packer-builder-arm
@@ -85,7 +93,7 @@ docker run --privileged --rm \
   -v ${IMGPATH}:/build/output-arm-image \
   -v "${IMAGE_PATH}":/mnt/image   \
   -v "${PROV_PATH}":/mnt/scripts  \
-  -v "${GIT_DIR}":/mnt/pi_scripts ${MOUNT_PATH} \
+  ${MOUNT_PATH} \
   ${CONTAINER} build ${JSON}
 
 if [[ "$?" != "0" ]]; then
